@@ -1,0 +1,120 @@
+<?xml version='1.0' encoding='ascii'?>
+<WireTemplates>
+  <T name="link">
+    <Item ID="0" Class="CIITLinkComp">
+      <CIITLinkComp Class="CIITLinkComp" instID="0" Stretchable="1" Moveable="1" LabelSelectable="1" Selectable="1" LockedPenColor="0" LockedBrushColor="0" Layer="511" ArrowAtSource="0" ArrowAtTarget="0" LineHidden="0" PenColor="255" FgColor="0" BgColor="16777215" Pen-Style="0" Pen-Width="1" Pen-Color="255" Hidden="0" ShowWhenNetSet="0" Connect1="0" Connect2="0" IsElvisHiddenWireFlags="0" Node="0" NodeText="0">
+        <Points />
+        <ElectricalObject HiddenName="0">
+          <ModifierInfo>
+            <Element NetModifier="&amp;ASCNI_EWB_NET_AUTONAMED">
+              <Item Value="" Guid="{35CACB19-5099-4E42-B161-4F62EDA4A6B0}" />
+            </Element>
+          </ModifierInfo>
+        </ElectricalObject>
+      </CIITLinkComp>
+    </Item>
+  </T>
+  <T name="extpin">
+    <Item ID="0" Class="CODPinComp">
+      <CODPinComp Class="CODPinComp" instID="0" Stretchable="1" Moveable="1" LabelSelectable="1" Selectable="1" LockedPenColor="0" LockedBrushColor="0" Layer="511" Text="" Internal="0" CenterX="414" CenterY="207" Mobility="1" Pen-Style="5" Pen-Width="1" Pen-Color="0" Hidden="0">
+        <ElectricalObject HiddenName="0">
+          <ModifierInfo />
+        </ElectricalObject>
+        <ConnectList />
+      </CODPinComp>
+    </Item>
+  </T>
+  <T name="junction">
+    <Item ID="0" Class="CODPinComp">
+      <CODPinComp Class="CODPinComp" instID="0" Stretchable="1" Moveable="1" LabelSelectable="1" Selectable="1" LockedPenColor="0" LockedBrushColor="0" Layer="511" Text="" Internal="0" CenterX="117" CenterY="171" Mobility="0" PenColor="255" Pen-Style="0" Pen-Width="1" Pen-Color="255" Hidden="0">
+        <ElectricalObject HiddenName="0">
+          <ModifierInfo />
+        </ElectricalObject>
+        <ConnectList />
+      </CODPinComp>
+    </Item>
+  </T>
+  <T name="nodetext">
+    <Item ID="0" Class="CODNodeTextComp">
+      <CODNodeTextComp Class="CODNodeTextComp" instID="0" Stretchable="0" Moveable="1" LabelSelectable="1" Selectable="1" LockedPenColor="0" LockedBrushColor="0" Layer="511" Output="" PenColor="255" FgColor="0" BgColor="16777215" Font-Height="-13" Font-Width="0" Font-Escapement="0" Font-Orientation="0" Font-Weight="700" Font-Italic="0" Font-Underline="0" Font-StrikeOut="0" Font-CharSet="0" Font-OutPrecision="3" Font-ClipPrecision="2" Font-Quality="1" Font-PitchAndFamily="34" Font-FaceName="&amp;ASCArial" Transformer-M00="1" Transformer-M01="0" Transformer-M10="0" Transformer-M11="1" Transformer-M20="266" Transformer-M21="146" Hidden="0" HorizontalAlign="0" VerticalAlign="0" KeepCurrentFont="0">
+        <Links />
+      </CODNodeTextComp>
+    </Item>
+  </T>
+  <T name="node">
+    <Item CiID="0" Class="CiNode">
+      <CiNode Class="CiNode" LocalName="&amp;ASC0" Circuit="0">
+        <Attributes>
+          <Item />
+          <Item />
+          <Item>
+            <CiaParamList Class="CiaParamList">
+              <doubles>
+                <Item Value="0" />
+                <Item Value="0" />
+                <Item Value="0" />
+                <Item Value="0" />
+                <Item Value="-1" />
+                <Item Value="1" />
+              </doubles>
+              <strings />
+              <parameters />
+              <paramindicators />
+            </CiaParamList>
+          </Item>
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="1" />
+          </Item>
+          <Item />
+          <Item />
+          <Item />
+          <Item />
+          <Item>
+            <CiaCString Class="CiaCString" String="" />
+          </Item>
+          <Item />
+          <Item />
+          <Item />
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+          <Item>
+            <CiaDOUBLE Class="CiaDOUBLE" Double="-1" />
+          </Item>
+        </Attributes>
+        <Ports />
+      </CiNode>
+    </Item>
+  </T>
+</WireTemplates>

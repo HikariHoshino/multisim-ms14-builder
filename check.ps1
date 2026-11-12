@@ -7,4 +7,5 @@ $c = $app.OpenFile($args[0])
 $names = $c.EnumComponents(0)
 $names
 $app.Disconnect()
-Get-Process multisim -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id } | Stop-Process -Force
+# 仿真服务进程（/SimServer）会在主进程退出前后才冒出来，隔两秒再查两轮，免得留下孤儿进程
+foreach ($i in 1..3) { Get-Process multisim -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id } | Stop-Process -Force; Start-Sleep 2 }

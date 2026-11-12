@@ -1,8 +1,8 @@
 # multisim-ms14-builder
 
-按一份 JSON 描述，自动生成 NI Multisim 14 电路文件（`.ms14`）：元件从 Multisim 自己的元件库取出，按固定规则摆好位置、改好名字，不连线。适合数字电路实验课这类“每道题都要先放一堆芯片、开关、电源、指示灯”的场景。
+按一份 JSON 描述，自动生成 NI Multisim 14 电路文件（`.ms14`）：元件从 Multisim 自己的元件库取出，按固定规则摆好位置、改好名字；描述里写了网络（`nets`）时，还会自动布局并用实线连好线，连通性可用 Multisim 网表自动核对。适合数字电路实验课这类“每道题都要先放一堆芯片、开关、电源、指示灯”的场景。也可作为 MCP 服务接入 Agent。
 
-Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description: parts are pulled from Multisim's own library, placed by layout rules and named, but left unwired.
+Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description: parts are pulled from Multisim's own library, placed by layout rules and named; if nets are given, they are also wired automatically (solid wires on the default A sheet) and checked against Multisim's own netlist. Also usable as an MCP server.
 
 > 本项目与 National Instruments 无关。Multisim 是 NI 的商标。
 
@@ -12,7 +12,11 @@ Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description:
 
 - `ms14.py`：`.ms14` 与 XML 互相转换（纯 Python 实现 PKWARE DCL implode / explode，无第三方依赖）。
 - `msedit.py`：在解压后的 XML 上复制、删除、移动、旋转元件。
-- `build.py`：读 JSON 描述，一步生成放好元件的 `.ms14`。
+- `build.py`：读 JSON 描述，一步生成放好元件（有 `nets` 时连好线）的 `.ms14`。
+- `route.py`：网格布线器（A* + 斯坦纳树），开关到 VCC/GND 走两条平行总线。
+- `wire_templates.xml`：连线、外部引脚、结点、网标、网络的 XML 模板，取自手工连好的电路。
+- `netcheck.py`、`msreport.ps1`：用 Multisim 导出网表与 spec 比对，或导出整页电路图 PNG。
+- `mcp_server.py`：把上面这些包成 MCP 工具（只用标准库）。
 - `msapi.ps1`、`check.ps1`：通过 Multisim 自带的自动化接口替换元件、打开文件列出元件；脚本结束时只关闭自己启动的 Multisim 进程。
 
 ## 环境
@@ -45,6 +49,31 @@ JSON 只写有哪些元件，不写坐标：
 - `role`：`chip` 主芯片、`gate` 门电路、`probe` 指示灯，决定摆放位置。
 - `name`：生成后的元件编号（RefDes），指示灯可以直接写输出名。
 
+### 自动连线
+
+在 JSON 里加 `nets`，每个网络列出它连接的所有引脚，写成 `元件名.引脚名`：
+
+```json
+"nets": {
+  "VCC": ["VCC.VCC", "S1.3", "S2.3", "U2.G1"],
+  "0":   ["0.1", "S1.1", "S2.1", "U1.~G"],
+  "A":   ["S1.2", "U1.A", "U2.A"],
+  "Y0":  ["U2.Y0", "X1.1"]
+}
+```
+
+- 开关（SPDT）：`3` 左上脚接 VCC，`1` 左下脚接地，`2` 右侧输出。
+- `VCC.VCC` 是电源；地元件名是 `0`，引脚 `1`。
+- 指示灯 PROBE 只有引脚 `1`。
+- 芯片用符号上的引脚名，低电平有效的带 `~`，如 `U1.~G`、`U2.~G2A`；芯片隐藏的 VCC/GND 脚不用写。
+- 完整示例见 `specs/实验二_5-2_8选1数据选择器分析.json`。
+
+核对连通性（导出 Multisim 网表，与 `nets` 按引脚集合逐个比对，全部一致时退出码为 0）：
+
+```bash
+python netcheck.py 输出.ms14 spec.json
+```
+
 单独转换文件：
 
 ```bash
@@ -65,18 +94,48 @@ python ms14.py encode 电路.xml 电路.ms14
 | 门电路 | 芯片下方排一行 |
 | 指示灯 | 最右元件右侧竖排一列，固定间距 |
 
+写了 `nets` 时改用另一套布局，保证整张图落在默认 A 纸内：
+
+| 元件 | 规则 |
+|---|---|
+| VCC、GROUND | 左上角 VCC，地在最后一个开关下方，两者各引一条竖直总线，VCC 在外、GND 在内，每个开关水平接出 |
+| 输入开关 | 竖排，一列放不下时分两列错开 |
+| 芯片、门 | 开关右侧竖排一列，整体垂直居中 |
+| 指示灯 | 芯片右侧横排，按驱动引脚高低排序；一行放不下时分上下两行 |
+
+走线规则：全部实线，尽量直、少拐弯，允许交叉；多引脚网络在中途用 T 形结点分叉；芯片引脚前两格只留给本引脚的网络。
+
+## MCP 服务
+
+`mcp_server.py` 是一个 stdio MCP 服务，只用标准库。它不操作 Multisim 界面：生成和编解码直接改文件，网表、截图、元件列表经 32 位 PowerShell 调 Multisim 自动化接口。
+
+```bash
+claude mcp add ms14gen -- python D:/路径/ms14gen/mcp_server.py
+```
+
+| 工具 | 作用 |
+|---|---|
+| `build_circuit` | 按 spec 生成 `.ms14`（输出已存在时需 `overwrite=true`） |
+| `check_connectivity` | 网表与 spec 的 `nets` 比对 |
+| `export_netlist` | 导出网表 |
+| `export_image` | 导出整页 PNG |
+| `list_components` | 列出元件 |
+| `decode_ms14` / `encode_ms14` | `.ms14` 与 XML 互转 |
+
 ## 工作原理
 
 1. **文件格式**：`.ms14` = 签名 `MSMCompressedElectronicsWorkbenchXML` + 总大小头 + 若干块（每块不超过 900000 字节，块头为解压/压缩大小），每块是 PKWARE DCL implode 压缩的 XML。
 2. **元件来源**：XML 里的每个元件都带着完整的符号图形、引脚、仿真模型，手写不现实。做法是从底板 `base.ms14` 克隆一个开关当占位，再调用自动化接口的 `ReplaceComponent` 让 Multisim 把占位换成库里的任意元件，符号和模型由 Multisim 自己填好。
 3. **方向修正**：开关符号带 `OrientationFlip=2`，替换出来的元件会继承这个翻转，导致元件倒置、标签错位；占位在替换前先扶正并把该标志清零。
 4. **摆放与命名**：替换完成后再解压，在 XML 里按规则改坐标，并同步修改元件名、符号上的名字文字和 RefDes 记录。
+5. **连线**：在网格上为每个网络布出一棵走线树，按 `wire_templates.xml` 写出连线（`CIITLinkComp`）、两端的外部引脚、分叉结点和网络（`CiNode`），并在引脚连接器与外部引脚的 `ConnectList` 里双向登记。
 
 ## 已知限制与坑
 
 - 只能替换开关这类占位；直接用 `ReplaceComponent` 替换芯片会让接口崩溃。
 - PowerShell 里 COM 方法的返回值要先赋给变量再使用，直接拼进字符串表达式也会崩溃。
-- 生成的文件只放元件，不连线。
+- 自动连线只在默认 A 纸（960×720）内布局，放不下时直接报错退出，不会改图纸尺寸。
+- 标签按 XML 坐标估算占位，开关切换键标签实际显示偏低，偶尔会被线压住，不影响连通性。
 
 ## 致谢
 

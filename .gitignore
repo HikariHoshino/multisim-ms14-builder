@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 base_无连线.ms14
 *Security copy*
+out/

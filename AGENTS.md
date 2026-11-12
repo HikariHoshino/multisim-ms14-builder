@@ -38,6 +38,10 @@
 | `msedit.py` | 在 XML 里复制、删除、移动、旋转元件 | 不改 |
 | `msapi.ps1` | 调 Multisim 接口把占位换成真实元件 | 不改 |
 | `check.ps1` | 用 Multisim 打开一个文件，列出里面的元件 | 不改 |
+| `route.py` | 自动连线的布线器 | 不改 |
+| `wire_templates.xml` | 写连线用的 XML 模板 | **绝对不改** |
+| `netcheck.py`、`msreport.ps1` | 导出网表核对连通性、导出电路图 PNG | 不改 |
+| `mcp_server.py` | MCP 服务，见第 9 节 | 不改 |
 | `base.ms14` | 底板：含 1 个开关、VCC、GROUND 等，所有元件都从这里派生 | **绝对不改** |
 | `specs/*.json` | 每道题的元件描述 | 你新建的 JSON 放这里 |
 
@@ -87,6 +91,38 @@
 - 表里没有的元件：让用户在 Multisim 的“放置元件”对话框里查到 组 / 系列 / 元件 三栏的名字告诉你，不要猜。
 - 写错名字时 `build.py` 会报 Multisim 替换失败，见第 6 节。
 
+### 3.2 自动连线：`nets`（可选）
+
+不写 `nets` 就只放元件、不连线。要连线时在 JSON 顶层加 `nets`，键是网络名（随便起，只用来区分），值是这个网络连接的**所有**引脚，每个写成 `元件名.引脚名`：
+
+```json
+"nets": {
+  "VCC": ["VCC.VCC", "S1.3", "S2.3", "U2.G1"],
+  "0":   ["0.1", "S1.1", "S2.1", "U1.~G"],
+  "A":   ["S1.2", "U1.A", "U2.A"],
+  "Y0":  ["U2.Y0", "X1.1"]
+}
+```
+
+引脚名对照（照抄，不要猜）：
+
+| 元件 | 引脚名 |
+|---|---|
+| 开关 S1、S2…… | `3` 接 VCC，`1` 接地，`2` 是输出 |
+| 电源 | `VCC.VCC` |
+| 地 | 元件名 `0`，引脚 `1`，即 `0.1` |
+| 指示灯 PROBE | `1` |
+| 芯片 | 符号上显示的引脚名；名字上有横线（低电平有效）的写成 `~` 开头，如 `U1.~G`、`U2.~G2A`、`U2.~G2B` |
+
+规则：
+- 每个开关的 `3` 都要放进 VCC 网络，`1` 都要放进地网络，`2` 放进它驱动的那个网络。
+- 芯片隐藏的 VCC/GND 电源脚不用写，Multisim 会自动接上。
+- 芯片上要固定接高/低电平的使能脚（如 74LS138 的 G1 接 VCC、74LS151 的 ~G 接地）要写进 VCC 或地网络。
+- 同一个引脚只能出现在一个网络里。
+- 完整示例：`specs/实验二_5-2_8选1数据选择器分析.json`。
+
+写了 `nets` 后布局会自动换成连线专用的一套（开关在左、芯片居中一列、指示灯在右），整张图必须放进默认 A 纸。放不下时 `build.py` 报错退出，**不要**去改图纸尺寸，把报错告诉用户。
+
 ## 4. 生成文件
 
 在本仓库目录下运行：
@@ -102,7 +138,7 @@ python build.py specs/my_circuit.json 输出路径/my_circuit.ms14
 2. 最后一行是 `written <输出路径> [...]`，方括号里的名字列表包含你在 JSON 里写的所有 `name`，以及 S1…Sn、VCC、0（0 就是 GROUND）。
 3. 输出文件确实存在。
 
-三条都满足才算成功。
+三条都满足才算成功。写了 `nets` 时还要看输出里没有 `FAIL <网络名>`（那个网络没布通），并做第 5 节的连通性核对。
 
 ## 5. 检查生成结果（可选，但第一次用时建议做）
 
@@ -112,7 +148,21 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionP
 
 输出第一行是 `name: my_circuit`，后面逐行列出元件名。和 JSON 对得上就说明 Multisim 能正常打开这个文件。
 
-画面布局（方向、标签、间距）脚本检查不了，交给用户用 Multisim 打开看。
+写了 `nets` 时**必须**核对连通性：
+
+```bash
+python netcheck.py "完整路径\my_circuit.ms14" specs/my_circuit.json
+```
+
+它让 Multisim 导出网表，按引脚集合与 `nets` 逐个比对，打印 `missing`（spec 有、文件里没有）和 `extra`（文件里有、spec 没有）。`"ok": true` 且退出码为 0 才算连对。
+
+要看画面，可导出整页截图：
+
+```powershell
+C:\Windows\SysWOW64\WindowsPowerShell1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File msreport.ps1 "完整路径\my_circuit.ms14" image "完整路径\截图"
+```
+
+生成 `截图.png`。画面美观与否最终交给用户用 Multisim 打开看。
 
 ## 6. 出错了怎么办
 
@@ -135,7 +185,8 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionP
 4. **不要覆盖用户正在 Multisim 里编辑的文件**。覆盖前先确认磁盘上的文件自你上次生成后没被用户保存过；用户开着它的话，提醒对方不保存关闭后再重新打开。
 5. **不要修改 `base.ms14`**。所有元件都从它派生，改坏了整个工具就不能用了。
 6. **不要在 JSON 里写坐标**。位置由 `build.py` 按规则计算；要调布局，只改 `build.py` 里的 `LAYOUT` 常量，并告诉用户你改了哪个值。
-7. **不要尝试让本工具连线**。当前版本只放元件。
+7. **不要手工往 XML 里写连线**。要连线就在 JSON 里写 `nets`，由 `build.py` 生成；连线涉及多处互相引用的 ID，手写几乎必错。
+8. **不要改图纸尺寸**。用户只用默认 A 纸。
 
 ## 8. 原理速览（排查疑难问题时再读）
 
@@ -144,3 +195,25 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionP
 3. 元件的符号、引脚、仿真模型都来自 Multisim 的元件库，手写不现实，所以由 Multisim 的 `ReplaceComponent` 填进来。
 4. 开关符号带 `OrientationFlip=2`，替换出来的元件会继承这个翻转，所以占位在替换前先扶正、把该标志清零。开关自己保留 `OrientationFlip=2`，那是它的正常朝向。
 5. 普通元件的位置写在符号自身的 `Transformer-M20/M21` 上；开关符号没有自身变换，位置分散在各子对象上，以 `CIITSymbolBorderRect` 为基准移动。
+6. 连线：`route.py` 在 9 单位网格上布线（A*，拐弯代价高、交叉代价低），多引脚网络长成斯坦纳树、在 T 形分叉处放结点；VCC 和地先为每列开关各拉一条竖直总线再水平接到每个开关。`msedit.wire_net` 按 `wire_templates.xml` 写出每条线（`CIITLinkComp`，点列 + 两端外部引脚）、结点（`CODPinComp`）、网标和网络（`CiNode`），并在引脚连接器与外部引脚的 `ConnectList` 里双向登记。
+
+## 9. MCP 服务
+
+`mcp_server.py` 把本工具包成 stdio MCP 服务，只用 Python 标准库。注册（Claude Code）：
+
+```bash
+claude mcp add ms14gen -- python 完整路径/ms14gen/mcp_server.py
+```
+
+其他客户端（Codex、DeepSeek 等）按各自的 MCP 配置方式，命令写 `python`，参数写 `mcp_server.py` 的完整路径。
+
+| 工具 | 参数 | 作用 |
+|---|---|---|
+| `build_circuit` | `spec`、`output`、`overwrite` | 同第 4 节。输出已存在时默认拒绝，确认用户没在 Multisim 里改过它再传 `overwrite=true` |
+| `check_connectivity` | `ms14`、`spec` | 同第 5 节的 netcheck |
+| `export_netlist` | `ms14` | 导出网表 |
+| `export_image` | `ms14`、`output` | 导出整页 PNG |
+| `list_components` | `ms14` | 同 check.ps1 |
+| `decode_ms14` / `encode_ms14` | 输入、`output` | `.ms14` 与 XML 互转 |
+
+所有路径用完整路径。调 Multisim 的工具每次 20～60 秒，第 7 节的规矩照样适用。
