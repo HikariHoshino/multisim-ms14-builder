@@ -6,6 +6,8 @@ Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description:
 
 > 本项目与 National Instruments 无关。Multisim 是 NI 的商标。
 
+> 用 Codex、Claude Code、DeepSeek 等自动化 Agent 操作本工具时，先读 [AGENTS.md](AGENTS.md)，里面有逐步操作说明、常用元件的库名和禁止事项。
+
 ## 能做什么
 
 - `ms14.py`：`.ms14` 与 XML 互相转换（纯 Python 实现 PKWARE DCL implode / explode，无第三方依赖）。
