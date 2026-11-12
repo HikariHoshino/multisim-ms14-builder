@@ -1,0 +1,9 @@
+{
+  "switches": 3,
+  "parts": [
+    {"name": "U1", "role": "chip", "lib": ["TTL", "74LS", "74LS153N"]},
+    {"name": "U2", "role": "gate", "lib": ["TTL", "74LS", "74LS00N"]},
+    {"name": "D", "role": "probe", "lib": ["Indicators", "PROBE", "PROBE_DIG_RED"]},
+    {"name": "Bo", "role": "probe", "lib": ["Indicators", "PROBE", "PROBE_DIG_RED"]}
+  ]
+}
