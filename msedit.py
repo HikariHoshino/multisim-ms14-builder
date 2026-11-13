@@ -2,6 +2,7 @@
 import copy
 import os
 import random
+import re
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -9,9 +10,15 @@ ID_ATTRS = ("ID", "CiID")
 REF_ATTRS = ("SymCompID", "CiComponent", "Component", "PortID")
 
 
+def _keep_ws(m):
+    # 元件仿真模型（.SUBCKT 等）是多行文本，原样写在属性值里；XML 解析会把属性里的换行规范化成空格，
+    # 模型就坏了（Multisim 仿真报 Invalid subckt definition），所以解析前先转义
+    return m.group(0).replace(b"\r", b"&#13;").replace(b"\n", b"&#10;").replace(b"\t", b"&#9;")
+
+
 class Circuit:
     def __init__(self, xml_bytes):
-        self.root = ET.fromstring(xml_bytes)
+        self.root = ET.fromstring(re.sub(rb'="[^"]*"', _keep_ws, xml_bytes))
         self.dg = self.root.find(".//CIITDiagram")
         self.elements = self.dg.find("Elements")
         self.graphics = self.dg.find("Components/CODComposite/Objects")
@@ -234,6 +241,8 @@ class Circuit:
 
     def tobytes(self):
         body = ET.tostring(self.root, encoding="unicode")
+        # 属性里的换行写回成原始字符，与 Multisim 自己保存的格式一致
+        body = body.replace("&#13;", "\r").replace("&#10;", "\n").replace("&#09;", "\t")
         return ('<?xml version="1.0" encoding="ASCII"?>\n' + body).encode("ascii", "xmlcharrefreplace")
 
 

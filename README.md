@@ -17,6 +17,7 @@ Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description:
 - `wire_templates.xml`：连线、外部引脚、结点、网标、网络的 XML 模板，取自手工连好的电路。
 - `netcheck.py`、`msreport.ps1`：用 Multisim 导出网表与 spec 比对，或导出整页电路图 PNG。
 - `figure.py`：导出电路图并裁到电路范围；可选地用 Microsoft Word 插进实验报告（见“可选：插进实验报告”）。
+- `restore_ws.py`：以一份完好的电路为参考，还原被 XML 规范化压平的多行属性值（见“已知限制与坑”）。
 - `mcp_server.py`：把上面这些包成 MCP 工具（只用标准库）。
 - `msapi.ps1`、`check.ps1`：通过 Multisim 自带的自动化接口替换元件、打开文件列出元件；脚本结束时只关闭自己启动的 Multisim 进程。
 
@@ -160,6 +161,8 @@ claude mcp add ms14gen -- python D:/路径/ms14gen/mcp_server.py
 - PowerShell 里 COM 方法的返回值要先赋给变量再使用，直接拼进字符串表达式也会崩溃。
 - 自动连线只在默认 A 纸（960×720）内布局，放不下时直接报错退出，不会改图纸尺寸。
 - 标签按 XML 坐标估算占位，开关切换键标签实际显示偏低，偶尔会被线压住，不影响连通性。
+- 仿真模型、开关交互模型、仿真设置是写在属性值里的多行文本，XML 解析会把其中的换行换成空格，SPICE 随即报 `Invalid subckt definition`、`Unmatched ".ENDS"` 等错误，开关拨不动。`msedit.py` 现在读写时保留这些字符；但 `base.ms14` 是修正前生成的，里面的这类文本已被压平，生成后要用 `restore_ws.py` 以一份能正常仿真的电路为参考还原（`python restore_ws.py 输出.ms14 还原.ms14 参考.ms14`）。网表核对和接口的 `RunSimulation` 都查不出这个问题，最终以 Multisim 里实际仿真为准。
+- 部分中文文件名会让 Multisim 接口抛 `AccessViolationException`，并留下无窗口的 `/SimServer` 进程；核对网表、导图前把文件复制成英文名。
 
 ## 致谢
 
