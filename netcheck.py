@@ -20,15 +20,23 @@ def run_report(ms14_path, *args):
 
 
 def netlist(ms14_path):
-    """返回 {网络名: {"元件.引脚", ...}}。地元件在网表里是 _uc 开头的转义名，统一记为 0。"""
+    """返回 {网络名: {"元件.引脚", ...}}。地元件在网表里是 _uc 开头的转义名，统一记为 0。
+
+    网表格式：表头两条虚线之后每行是 网络、电路名、元件、引脚。电路名就是文件名，中文会转义成
+    很长的 _uc 串、可能含空格或折到下一行（折行以空白开头），所以只取首列和末两列。
+    一片多门的芯片按门写成 U2A、U2B，统一去掉门的字母，与 spec 里的 U2.1A 对应。"""
     out, err = run_report(ms14_path, "netlist")
     nets = {}
+    dashes = 0
     for line in out.splitlines():
+        if line.startswith("---"):
+            dashes += 1
+            continue
         f = line.split()
-        # 第二列是单个字母，不同次导出可能是 w 或 t，不认具体字母
-        if len(f) == 4 and len(f[1]) == 1:
-            comp = "0" if f[2].startswith("_uc") else f[2]
-            nets.setdefault(f[0], set()).add(comp + "." + f[3])
+        if dashes < 2 or len(f) < 4 or line[0].isspace():
+            continue
+        comp = "0" if f[-2].startswith("_uc") else re.sub(r"^(U\d+)[A-Z]$", r"\1", f[-2])
+        nets.setdefault(f[0], set()).add(comp + "." + f[-1])
     if not nets:
         raise RuntimeError("没有读到网表：\n" + (err or out)[:2000])
     return nets

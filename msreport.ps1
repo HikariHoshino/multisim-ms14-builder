@@ -1,4 +1,4 @@
-# 用法：msreport.ps1 <文件.ms14> netlist            输出 Multisim 网表文本（每行：网络 单字母 元件 引脚）
+# 用法：msreport.ps1 <文件.ms14> netlist            输出 Multisim 网表文本（每行：网络 电路名 元件 引脚）
 #       msreport.ps1 <文件.ms14> image <输出路径>   导出整页电路图，Multisim 自动补 .png 扩展名
 # 结束时只关掉本脚本启动的 Multisim 进程，不碰用户自己开着的窗口。
 $before = @(Get-Process multisim -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })

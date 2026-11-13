@@ -41,6 +41,7 @@
 | `route.py` | 自动连线的布线器 | 不改 |
 | `wire_templates.xml` | 写连线用的 XML 模板 | **绝对不改** |
 | `netcheck.py`、`msreport.ps1` | 导出网表核对连通性、导出电路图 PNG | 不改 |
+| `figure.py` | 导出裁好的电路图；可选插进实验报告 | 不改 |
 | `mcp_server.py` | MCP 服务，见第 9 节 | 不改 |
 | `base.ms14` | 底板：含 1 个开关、VCC、GROUND 等，所有元件都从这里派生 | **绝对不改** |
 | `specs/*.json` | 每道题的元件描述 | 你新建的 JSON 放这里 |
@@ -121,7 +122,7 @@
 - 同一个引脚只能出现在一个网络里。
 - 完整示例：`specs/实验二_5-2_8选1数据选择器分析.json`。
 
-写了 `nets` 后布局会自动换成连线专用的一套（开关在左、芯片居中一列、指示灯在右），整张图必须放进默认 A 纸。放不下时 `build.py` 报错退出，**不要**去改图纸尺寸，把报错告诉用户。
+写了 `nets` 后布局会自动换成连线专用的一套（开关在左；门按信号流向放在芯片左边或右边一列；指示灯在最右），整张图必须放进默认 A 纸。放不下时 `build.py` 报错退出，**不要**去改图纸尺寸，把报错告诉用户。
 
 ## 4. 生成文件
 
@@ -159,10 +160,48 @@ python netcheck.py "完整路径\my_circuit.ms14" specs/my_circuit.json
 要看画面，可导出整页截图：
 
 ```powershell
-C:\Windows\SysWOW64\WindowsPowerShell1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File msreport.ps1 "完整路径\my_circuit.ms14" image "完整路径\截图"
+C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File msreport.ps1 "完整路径\my_circuit.ms14" image "完整路径\截图"
 ```
 
 生成 `截图.png`。画面美观与否最终交给用户用 Multisim 打开看。
+
+### 5.1 导出电路图，并（可选）放进实验报告
+
+1. 导出裁好的电路图（需要 Pillow）：
+
+   ```bash
+   python figure.py image "完整路径\my_circuit.ms14" "完整路径\电路图.png"
+   ```
+
+   输出只含电路本身（四周留一格白边），已放大 3 倍。不要再自己截屏或裁图。
+
+2. 可选，只在用户要写报告时做。需要 pywin32 和 Microsoft Word。**先备份报告**（复制一份），再插图：
+
+   ```bash
+   python figure.py insert "完整路径\报告.docx" "完整路径\电路图.png" --section "（五）" --nth 2 --caption "图注文字"
+   ```
+
+   - `--section`：题目标题的开头，原样抄报告里的写法，如 `（五）`。
+   - `--nth`：这道题之后第几个以“电路图”结尾的小节。一道题有“1. 2.”两个小题时，第二小题的电路图就是 `--nth 2`。
+   - `--caption`：只在新插图时用；那里原来有图时会原位替换，图注保持不变。
+   - 报告还没细化、没有“电路图”小节时，加 `--anchor "画出所设计的逻辑电路图"`（抄题目下提示句的开头），图放在这句后面；`--nth` 照样从 1 数。
+   - 输出 `替换：…` 或 `新插：…` 才算成功。报告必须没有在 Word 里打开；只能用 Microsoft Word，绝不用 WPS。
+
+### 5.2 从题目到报告的全流程
+
+用户只给题目（或报告、指导书）时，按下面顺序一次做完，每步都要满足“成功标准”才往下走：
+
+| 步骤 | 做什么 | 成功标准 |
+|---|---|---|
+| 1 | 读题目要求，定输入输出变量，列真值表，选芯片（用题目指定的型号，74LS 系列带 N） | 真值表覆盖全部输入组合 |
+| 2 | 推出每个芯片引脚接什么，写成 spec（第 3 节，含 `nets`） | 每个开关的 1、2、3 脚都在 nets 里；芯片使能脚已接 VCC 或地 |
+| 3 | `python build.py spec.json 输出.ms14` | 第 4 节三条，且没有 `走不通` |
+| 4 | `python netcheck.py 输出.ms14 spec.json` | `"ok": true` |
+| 5 | 按 netcheck 导出的网表把每种输入组合代进芯片功能算一遍，和第 1 步的真值表逐行比 | 全部一致 |
+| 6 | `python figure.py image 输出.ms14 电路图.png` | 图里电路完整 |
+| 7 | 可选：备份报告后 `python figure.py insert …` | 输出 `替换：…` 或 `新插：…` |
+
+第 1、2 步是设计，需要你自己推导；第 3～7 步全是固定命令。第 5 步不要省：网表一致只说明连线和 spec 一样，spec 本身推错了只有这一步能发现。
 
 ## 6. 出错了怎么办
 
@@ -213,6 +252,8 @@ claude mcp add ms14gen -- python 完整路径/ms14gen/mcp_server.py
 | `check_connectivity` | `ms14`、`spec` | 同第 5 节的 netcheck |
 | `export_netlist` | `ms14` | 导出网表 |
 | `export_image` | `ms14`、`output` | 导出整页 PNG |
+| `export_figure` | `ms14`、`output` | 同 5.1 第 1 步 |
+| `insert_figure` | `docx`、`png`、`section`、`nth`、`caption`、`anchor` | 可选，同 5.1 第 2 步，先备份报告 |
 | `list_components` | `ms14` | 同 check.ps1 |
 | `decode_ms14` / `encode_ms14` | 输入、`output` | `.ms14` 与 XML 互转 |
 

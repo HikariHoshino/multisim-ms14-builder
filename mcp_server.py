@@ -15,6 +15,7 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ms14  # noqa: E402
+import figure  # noqa: E402
 import netcheck  # noqa: E402
 
 PS32 = netcheck.PS32
@@ -39,6 +40,19 @@ TOOLS = [
      "inputSchema": {"type": "object", "required": ["ms14", "output"], "properties": {
          "ms14": {"type": "string"},
          "output": {"type": "string", "description": "输出路径，不带扩展名时自动补 .png"}}}},
+    {"name": "export_figure",
+     "description": "导出报告用电路图：整页导出后裁到电路范围（留一格白边），放大 3 倍存为 PNG。",
+     "inputSchema": {"type": "object", "required": ["ms14", "output"], "properties": {
+         "ms14": {"type": "string"}, "output": {"type": "string", "description": "输出 .png 路径"}}}},
+    {"name": "insert_figure",
+     "description": "用 Microsoft Word 把图片放进实验报告某道题的“电路图”小节，宽度等于版心宽。"
+                    "那里已有图就原位替换，没有就新插图片和居中图注。会直接保存报告，调用前先备份。",
+     "inputSchema": {"type": "object", "required": ["docx", "png", "section"], "properties": {
+         "docx": {"type": "string"}, "png": {"type": "string"},
+         "section": {"type": "string", "description": "题目标题开头，如“（五）”"},
+         "nth": {"type": "integer", "description": "该题目之后第几个“电路图”小节，默认 1"},
+         "caption": {"type": "string", "description": "新插图时的图注；替换旧图时不用"},
+         "anchor": {"type": "string", "description": "报告还没有“电路图”小节时，改找包含这段文字的段落，如“画出所设计的逻辑电路图”"}}}},
     {"name": "list_components",
      "description": "用 Multisim 打开文件，列出元件名。",
      "inputSchema": {"type": "object", "required": ["ms14"], "properties": {"ms14": {"type": "string"}}}},
@@ -80,6 +94,10 @@ def call(name, a):
         if not os.path.exists(stem + ".png"):
             raise RuntimeError("Multisim 没有导出图片")
         return stem + ".png"
+    if name == "export_figure":
+        return figure.image(a["ms14"], a["output"])
+    if name == "insert_figure":
+        return figure.insert(a["docx"], a["png"], a["section"], a.get("nth", 1), a.get("caption"), a.get("anchor"))
     if name == "list_components":
         res = subprocess.run([PS32, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                               os.path.join(HERE, "check.ps1"), os.path.abspath(a["ms14"])],

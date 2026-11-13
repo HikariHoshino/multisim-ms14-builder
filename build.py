@@ -145,21 +145,44 @@ def arrange_wired(c, spec):
         px = geometry_of(c, col[0])[0]["2"][2] + 6 * G
     last = geometry_of(c, cols[0][-1])[0]["1"][3]
     put_pin(c, "0", "1", vx + G, last + 3 * G)
-    # 芯片和门：竖排一列，放在开关输出右侧的走线通道之后，整列竖直居中
+    # 芯片和门按信号流向分列：吃芯片输出的门放在芯片右边一列，其余的门（如给芯片供反变量的反相器）
+    # 放在开关和芯片之间一列；有芯片时芯片一列，各列竖直居中，列与列之间留走线通道
     sw_right = max(geometry_of(c, s)[0]["2"][2] for s in switches)
+    chips = [p["name"] for p in parts if p["role"] == "chip"]
+    gates = [p["name"] for p in parts if p["role"] == "gate"]
+    chip_out = set()
+    for ch in chips:
+        pins, rect = geometry_of(c, ch)
+        chip_out |= {(ch, n) for n, v in pins.items() if v[2] >= rect[2]}
+    post = [g for g in gates if any(
+        any((o, q) in chip_out for o, q in (r.split(".", 1) for r in refs)) and any(r.startswith(g + ".") for r in refs)
+        for refs in nets.values())] if chips else []
+    pre = [g for g in gates if g not in post]
+
+    def links(a, b):
+        """a、b 两组元件之间直接相连的网络数，决定中间走线通道的宽度。"""
+        return sum(1 for refs in nets.values()
+                   if any(r.split(".", 1)[0] in a for r in refs) and any(r.split(".", 1)[0] in b for r in refs))
+
+    def channel(n):
+        # 每根线一条竖道，再加芯片引脚门口保留的 2 格；线少时也至少留 8 格，否则拐不开
+        return max(n + 2, 8) * G
+
     n_sig = sum(1 for refs in nets.values() if any(r.split(".", 1)[1] == "2" and r.startswith("S") for r in refs))
-    cx = sw_right + (n_sig + 2) * G
-    stack = [p["name"] for p in parts if p["role"] == "chip"] + [p["name"] for p in parts if p["role"] == "gate"]
-    exts = {s: display_extent(c, s) for s in stack}
-    total = sum(e[3] - e[1] for e in exts.values()) + 2 * G * (len(stack) - 1)
-    y = max(y0 + 2 * G, (y0 + y1 - total) / 2)
-    right = cx
-    for s in stack:
-        e, rect = exts[s], geometry_of(c, s)[1]
-        c.move(s, snap(cx - rect[0]), snap(y - e[1]))
-        e = display_extent(c, s)
-        right = max(right, e[2])
-        y = e[3] + 2 * G
+    right = sw_right
+    for col, n in ((pre, n_sig), (chips, n_sig + links(pre, chips)), (post, links(chips, post))):
+        if not col:
+            continue
+        cx = right + channel(n)
+        exts = {s: display_extent(c, s) for s in col}
+        total = sum(e[3] - e[1] for e in exts.values()) + 2 * G * (len(col) - 1)
+        y = max(y0 + 2 * G, (y0 + y1 - total) / 2)
+        for s in col:
+            e, rect = exts[s], geometry_of(c, s)[1]
+            c.move(s, snap(cx - rect[0]), snap(y - e[1]))
+            e = display_extent(c, s)
+            right = max(right, e[2])
+            y = e[3] + 2 * G
     # 指示灯：按驱动线从上到下排序；上面一行引脚朝下、线从下方直上接入；下面一行线从侧面接入
     probes = [p["name"] for p in parts if p["role"] == "probe"]
     if not probes:

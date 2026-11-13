@@ -1,0 +1,19 @@
+{
+  "switches": 3,
+  "parts": [
+    {"name": "U1", "role": "chip",  "lib": ["TTL", "74LS", "74LS153N"]},
+    {"name": "U2", "role": "gate",  "lib": ["TTL", "74LS", "74LS00N"]},
+    {"name": "D",  "role": "probe", "lib": ["Indicators", "PROBE", "PROBE_DIG_RED"]},
+    {"name": "Bo", "role": "probe", "lib": ["Indicators", "PROBE", "PROBE_DIG_RED"]}
+  ],
+  "nets": {
+    "VCC": ["VCC.VCC", "S1.3", "S2.3", "S3.3", "U1.2C1"],
+    "0":   ["0.1", "S1.1", "S2.1", "S3.1", "U1.~1G", "U1.~2G", "U1.2C2"],
+    "A":   ["S1.2", "U1.B"],
+    "B":   ["S2.2", "U1.A"],
+    "C":   ["S3.2", "U2.1A", "U2.1B", "U1.1C0", "U1.1C3", "U1.2C0", "U1.2C3"],
+    "NC":  ["U2.1Y", "U1.1C1", "U1.1C2"],
+    "Dn":  ["U1.1Y", "D.1"],
+    "Bon": ["U1.2Y", "Bo.1"]
+  }
+}

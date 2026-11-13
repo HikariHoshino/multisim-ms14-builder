@@ -1,6 +1,6 @@
 # multisim-ms14-builder
 
-按一份 JSON 描述，自动生成 NI Multisim 14 电路文件（`.ms14`）：元件从 Multisim 自己的元件库取出，按固定规则摆好位置、改好名字；描述里写了网络（`nets`）时，还会自动布局并用实线连好线，连通性可用 Multisim 网表自动核对。适合数字电路实验课这类“每道题都要先放一堆芯片、开关、电源、指示灯”的场景。也可作为 MCP 服务接入 Agent。
+按一份 JSON 描述，自动生成 NI Multisim 14 电路文件（`.ms14`）：元件从 Multisim 自己的元件库取出，按固定规则摆好位置、改好名字；描述里写了网络（`nets`）时，还会自动布局并用实线连好线，连通性可用 Multisim 网表自动核对，还能导出只含电路本身的截图。适合数字电路实验课这类“每道题都要先放一堆芯片、开关、电源、指示灯”的场景。也可作为 MCP 服务接入 Agent。
 
 Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description: parts are pulled from Multisim's own library, placed by layout rules and named; if nets are given, they are also wired automatically (solid wires on the default A sheet) and checked against Multisim's own netlist. Also usable as an MCP server.
 
@@ -16,13 +16,14 @@ Generate NI Multisim 14 schematic files (`.ms14`) from a small JSON description:
 - `route.py`：网格布线器（A* + 斯坦纳树），开关到 VCC/GND 走两条平行总线。
 - `wire_templates.xml`：连线、外部引脚、结点、网标、网络的 XML 模板，取自手工连好的电路。
 - `netcheck.py`、`msreport.ps1`：用 Multisim 导出网表与 spec 比对，或导出整页电路图 PNG。
+- `figure.py`：导出电路图并裁到电路范围；可选地用 Microsoft Word 插进实验报告（见“可选：插进实验报告”）。
 - `mcp_server.py`：把上面这些包成 MCP 工具（只用标准库）。
 - `msapi.ps1`、`check.ps1`：通过 Multisim 自带的自动化接口替换元件、打开文件列出元件；脚本结束时只关闭自己启动的 Multisim 进程。
 
 ## 环境
 
 - Windows，已安装 Multisim 14.3（需要它注册的 `MultisimInterface.MultisimApp` 自动化接口，这是 32 位 COM 组件，脚本通过 `C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe` 调用）。
-- Python 3（64 位即可），只用标准库。
+- Python 3（64 位即可）。生成、连线、网表核对只用标准库；裁图需要 Pillow；可选的插报告功能另需 pywin32 和 Microsoft Word。
 
 ## 用法
 
@@ -74,6 +75,14 @@ JSON 只写有哪些元件，不写坐标：
 python netcheck.py 输出.ms14 spec.json
 ```
 
+导出只含电路本身的截图（需要 Pillow）：
+
+```bash
+python figure.py image 输出.ms14 电路图.png
+```
+
+Multisim 接口只能按 A 纸 960×720 导出（1 坐标单位 = 1 像素，没有更高分辨率或矢量格式）。脚本在图框内找出电路的实际范围，留一格白边裁下，再按最近邻放大 3 倍，放进文档缩放后文字不发虚。
+
 单独转换文件：
 
 ```bash
@@ -100,10 +109,23 @@ python ms14.py encode 电路.xml 电路.ms14
 |---|---|
 | VCC、GROUND | 左上角 VCC，地在最后一个开关下方，两者各引一条竖直总线，VCC 在外、GND 在内，每个开关水平接出 |
 | 输入开关 | 竖排，一列放不下时分两列错开 |
-| 芯片、门 | 开关右侧竖排一列，整体垂直居中 |
+| 芯片、门 | 按信号流向分列：吃芯片输出的门在芯片右边一列，其余的门（如给芯片供反变量的反相器）在开关和芯片之间一列；各列竖直居中，列间走线通道至少 8 格 |
 | 指示灯 | 芯片右侧横排，按驱动引脚高低排序；一行放不下时分上下两行 |
 
 走线规则：全部实线，尽量直、少拐弯，允许交叉；多引脚网络在中途用 T 形结点分叉；芯片引脚前两格只留给本引脚的网络。
+
+## 可选：插进实验报告
+
+不写报告可以跳过这一节。需要 pywin32 和 Microsoft Word（通过 COM 独立启动一个 Word 实例，不碰已打开的窗口）。
+
+```bash
+python figure.py insert 报告.docx 电路图.png --section "（五）" --nth 2 --caption "8 选 1 数据选择器分析电路仿真电路"
+python figure.py insert 报告.docx 电路图.png --section "（三）" --anchor "画出所设计的逻辑电路图"
+```
+
+- 先找以 `--section` 开头的题目，再往后数第 `--nth` 个以“电路图”结尾的小节；报告还没有这种小节时，用 `--anchor` 改找包含指定文字的段落。
+- 图放在该段之后，宽度等于版心宽、等比缩放。那里已有图片就原位替换（保留图注），没有就新插图片段；给了 `--caption` 时再加居中图注。
+- 会直接保存报告，插图前先备份。
 
 ## MCP 服务
 
@@ -119,6 +141,8 @@ claude mcp add ms14gen -- python D:/路径/ms14gen/mcp_server.py
 | `check_connectivity` | 网表与 spec 的 `nets` 比对 |
 | `export_netlist` | 导出网表 |
 | `export_image` | 导出整页 PNG |
+| `export_figure` | 导出只含电路本身的截图 |
+| `insert_figure` | 可选：把截图插进实验报告 |
 | `list_components` | 列出元件 |
 | `decode_ms14` / `encode_ms14` | `.ms14` 与 XML 互转 |
 
