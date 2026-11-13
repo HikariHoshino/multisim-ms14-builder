@@ -144,13 +144,13 @@ python build.py specs/my_circuit.json 输出路径/my_circuit.ms14
 
 运行前设 `PYTHONIOENCODING=utf-8`，否则输出路径含中文时最后一行 `written` 会报 `UnicodeEncodeError`（文件其实已写出）。
 
-**生成后必须还原多行文本**：`base.ms14` 里的仿真设置、开关交互模型等多行文本早年被压成了单行（原因见第 8 节第 7 条），每次生成都会带进输出文件，Multisim 仿真报错、开关拨不动。生成后用一份 Multisim 自己保存、能正常仿真的电路文件作参考还原：
+**旧文件的多行文本**：2026-11-13 之前生成的文件里，仿真设置、开关交互模型等多行文本被压成了单行（原因见第 8 节第 7 条），Multisim 仿真报错、开关拨不动。`base.ms14` 和 `msedit.py` 都已修好，新生成的文件不受影响；修旧文件时用一份 Multisim 自己保存、能正常仿真的电路作参考还原：
 
 ```bash
-python restore_ws.py 输出.ms14 输出_还原.ms14 参考电路.ms14
+python restore_ws.py 旧文件.ms14 还原后.ms14 参考电路.ms14
 ```
 
-输出 `仍像被压平的 0` 且退出码为 0 才算成功；再用还原后的文件做后续步骤。参考文件最好也用同一底板派生、含同类元件的电路。
+输出 `仍像被压平的 0` 且退出码为 0 才算成功。参考文件可以直接用 `base.ms14`，再加一份含同类芯片的电路。
 
 ## 5. 检查生成结果（可选，但第一次用时建议做）
 
@@ -222,7 +222,7 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionP
 | 某行 `P3 -> ` 箭头右边是空的 | 这个占位的 `lib` 在库里找不到 | 只改这一个元件的 `lib`，重跑 |
 | PowerShell 报 `AccessViolationException` | 调 COM 方法的写法不对（见第 7 节） | 不要改 `msapi.ps1`；如果是你自己写的脚本，按第 7 节改 |
 | 生成的文件里元件倒置、标签错位 | 你绕过了 `build.py` 自己拼流程 | 回到用 `build.py` 生成 |
-| Multisim 能打开、连线也对，但仿真时开关拨不动，SPICE 网表检查报 `Invalid subckt definition`、`Unmatched ".ENDS"`、`gminsteps:long{` 等 | 属性里的多行文本被压成了单行（第 8 节第 7 条） | 按第 4 节用 `restore_ws.py` 还原。`netcheck.py` 只查连通性，接口的 `RunSimulation` 对这种文件也返回成功，两者都发现不了，必须让用户实际仿真确认 |
+| Multisim 能打开、连线也对，但仿真时开关拨不动，SPICE 网表检查报 `Invalid subckt definition`、`Unmatched ".ENDS"`、`gminsteps:long{` 等 | 属性里的多行文本被压成了单行（第 8 节第 7 条），多见于 2026-11-13 之前生成的文件 | 按第 4 节用 `restore_ws.py` 还原。`netcheck.py` 只查连通性，接口的 `RunSimulation` 对这种文件也返回成功，两者都发现不了，必须让用户实际仿真确认 |
 | netcheck / figure.py 报 `AccessViolationException`，并留下无窗口的 `multisim.exe /SimServer` 进程 | 部分中文文件名会让 Multisim 接口崩溃，脚本的清理段没来得及执行 | 把文件复制成英文名再跑；结束后查 `/SimServer` 残留，只关本次启动时间之后的 |
 
 ## 7. 绝对不要做的事
@@ -248,7 +248,7 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionP
 4. 开关符号带 `OrientationFlip=2`，替换出来的元件会继承这个翻转，所以占位在替换前先扶正、把该标志清零。开关自己保留 `OrientationFlip=2`，那是它的正常朝向。
 5. 普通元件的位置写在符号自身的 `Transformer-M20/M21` 上；开关符号没有自身变换，位置分散在各子对象上，以 `CIITSymbolBorderRect` 为基准移动。
 6. 连线：`route.py` 在 9 单位网格上布线（A*，拐弯代价高、交叉代价低），多引脚网络长成斯坦纳树、在 T 形分叉处放结点；VCC 和地先为每列开关各拉一条竖直总线再水平接到每个开关。`msedit.wire_net` 按 `wire_templates.xml` 写出每条线（`CIITLinkComp`，点列 + 两端外部引脚）、结点（`CODPinComp`）、网标和网络（`CiNode`），并在引脚连接器与外部引脚的 `ConnectList` 里双向登记。
-7. 多行属性值：元件仿真模型（`.SUBCKT … .ENDS`）、开关交互模型（`* !!!BEGIN-INTERACT`）、仿真设置（`list{IsEnabled:long{0}` 换行 `gminsteps:long{10}` …）都是多行文本，Multisim 把换行原样写在属性值里。按 XML 标准，解析器会把属性里的每个换行、回车、制表符换成一个空格，写回后 SPICE 把多行语句当成一行解析而报错。`msedit.Circuit` 解析前已把属性里的这三种字符转义成 `&#10;` 等，写回时再还原成原始字符，与 Multisim 自己保存的格式一致。`base.ms14` 是在这项修正之前生成的，里面的这类文本已经被压平，只能用 `restore_ws.py` 从完好的文件找回：规范化是一个字符换一个空格，“压平后的样子”与原文一一对应，可以精确还原。
+7. 多行属性值：元件仿真模型（`.SUBCKT … .ENDS`）、开关交互模型（`* !!!BEGIN-INTERACT`）、仿真设置（`list{IsEnabled:long{0}` 换行 `gminsteps:long{10}` …）都是多行文本，Multisim 把换行原样写在属性值里。按 XML 标准，解析器会把属性里的每个换行、回车、制表符换成一个空格，写回后 SPICE 把多行语句当成一行解析而报错。`msedit.Circuit` 解析前已把属性里的这三种字符转义成 `&#10;` 等，写回时再还原成原始字符，与 Multisim 自己保存的格式一致。`base.ms14` 曾在这项修正之前被写回过，83 处这类文本被压平，2026-11-13 已用 `restore_ws.py` 从完好的文件找回（去掉空白后内容与修复前完全相同）。规范化是一个字符换一个空格，“压平后的样子”与原文一一对应，所以能精确还原。底板里的模型文本坏掉时，Multisim 对不上库里的同名模型，会给新放的芯片另建 `__NON__2` 之类的副本，看到这种副本可以作为底板又被写坏的信号。
 
 ## 9. MCP 服务
 

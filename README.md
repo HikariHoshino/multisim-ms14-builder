@@ -161,7 +161,7 @@ claude mcp add ms14gen -- python D:/路径/ms14gen/mcp_server.py
 - PowerShell 里 COM 方法的返回值要先赋给变量再使用，直接拼进字符串表达式也会崩溃。
 - 自动连线只在默认 A 纸（960×720）内布局，放不下时直接报错退出，不会改图纸尺寸。
 - 标签按 XML 坐标估算占位，开关切换键标签实际显示偏低，偶尔会被线压住，不影响连通性。
-- 仿真模型、开关交互模型、仿真设置是写在属性值里的多行文本，XML 解析会把其中的换行换成空格，SPICE 随即报 `Invalid subckt definition`、`Unmatched ".ENDS"` 等错误，开关拨不动。`msedit.py` 现在读写时保留这些字符；但 `base.ms14` 是修正前生成的，里面的这类文本已被压平，生成后要用 `restore_ws.py` 以一份能正常仿真的电路为参考还原（`python restore_ws.py 输出.ms14 还原.ms14 参考.ms14`）。网表核对和接口的 `RunSimulation` 都查不出这个问题，最终以 Multisim 里实际仿真为准。
+- 仿真模型、开关交互模型、仿真设置是写在属性值里的多行文本，XML 解析会把其中的换行换成空格，SPICE 随即报 `Invalid subckt definition`、`Unmatched ".ENDS"` 等错误，开关拨不动。`msedit.py` 现在读写时保留这些字符，`base.ms14` 里早先被压平的 83 处也已还原，新生成的文件不受影响。2026-11-13 之前生成的旧文件可以用 `restore_ws.py` 以一份能正常仿真的电路为参考还原（`python restore_ws.py 旧文件.ms14 还原.ms14 参考.ms14`）。网表核对和接口的 `RunSimulation` 都查不出这个问题，最终以 Multisim 里实际仿真为准。
 - 部分中文文件名会让 Multisim 接口抛 `AccessViolationException`，并留下无窗口的 `/SimServer` 进程；核对网表、导图前把文件复制成英文名。
 
 ## 致谢
